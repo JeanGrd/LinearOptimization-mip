@@ -1,44 +1,54 @@
+# Import necessary modules from MIP library and utility functions
 from mip import Model, MAXIMIZE, xsum, OptimizationStatus
-from utils import generate_valid_combinations, count_items_in_combinations
+from utils import count_items_in_combinations, generate_valid_combinations
 
-# Variable definitions
-widths = {'A': 110, 'B': 92, 'C': 80, 'D': 74, 'E': 70, 'F': 65}
-selling_prices = {'A': 100, 'B': 80, 'C': 70, 'D': 65, 'E': 60, 'F': 57}
-cost_per_meter = 120
+# Define lengths and selling prices for items, and the cost per meter
+lengths = {'A': 110, 'B': 92, 'C': 80, 'D': 74, 'E': 70, 'F': 65}
+prix_vente = {'A': 100, 'B': 80, 'C': 70, 'D': 65, 'E': 60, 'F': 57}
+cout_par_metre = 120
 
-# Generate valid combinations of widths within specified length range
-combinations = generate_valid_combinations(widths, 180, 245)
+# Generate valid combinations of items within specified length constraints
+combinaisons = generate_valid_combinations(lengths, 180, 245)
 
-# Calculate the net value of each combination
-net_values = [sum(selling_prices[i] for i in comb) - cost_per_meter for comb in combinations]
-variable_names = ["x" + ''.join(comb) for comb in combinations]
+# Calculate values for each combination (revenue minus cost)
+values_combinaisons = [sum(prix_vente[i] for i in comb) - cout_par_metre for comb in combinaisons]
 
-# Model initialization
-model = Model("Rouleau", sense=MAXIMIZE)
-variables = [model.add_var(name=name) for name in variable_names]
+# Create variable names for each combination
+inconnus_combinaisons = ["x" + ''.join(comb) for comb in combinaisons]
 
-# Setting the objective function
-model.objective = xsum(net_values[i] * variables[i] for i in range(len(net_values)))
+# Print the variable names (for debugging or verification)
+print(inconnus_combinaisons)
 
-#Contraints
-items_constraints = {item: 400 for item in widths.keys()}
-half_constraints = {item: 0.5 for item in widths.keys()}
-special_constraint_items = ['C', 'A']
+# Create an optimization model to maximize profit
+m = Model("Rouleau", sense=MAXIMIZE)
 
-for item in widths.keys():
-    item_counts = count_items_in_combinations(combinations, item)
-    model += xsum(count * variables[idx] for idx, count in item_counts.items()) <= items_constraints[item]
-    model += xsum(count * variables[idx] for idx, count in item_counts.items()) <= half_constraints[item] * xsum(variables)
+# Add variables to the model for each combination
+vars = [m.add_var(name=v) for v in inconnus_combinaisons]
 
-c_counts = count_items_in_combinations(combinations, 'C')
-a_counts = count_items_in_combinations(combinations, 'A')
-model += xsum(count * variables[idx] for idx, count in c_counts.items()) <= 100 + xsum(count * variables[idx] for idx, count in a_counts.items())
+# Define the objective function (maximize total value of combinations)
+m.objective = xsum(values_combinaisons[i] * vars[i] for i in range(35))
 
-model.optimize()
+# Add constraints for the number of each item used in the combinations
+item_constraints = ['A', 'B', 'C', 'D', 'E', 'F']
+for item in item_constraints:
+    m += xsum(value * vars[key] for key, value in count_items_in_combinations(inconnus_combinaisons, item).items()) <= 400
 
-if model.status == OptimizationStatus.OPTIMAL:
-    for name, var in zip(variable_names, variables):
-        print(f"{name} = {var.x}")
-    print(f"Total cost: {model.objective_value}")
+# Add constraints to limit the number of certain items relative to the total number of items used
+for item in item_constraints:
+    m += xsum(value * vars[key] for key, value in count_items_in_combinations(inconnus_combinaisons, item).items()) <= 0.5 * xsum(
+        (len(inconnus_combinaisons[indice])-1) * vars[indice] for indice, x in enumerate(inconnus_combinaisons))
+
+# Additional constraint specific to items 'C' and 'A'
+m += xsum(value * vars[key] for key, value in count_items_in_combinations(inconnus_combinaisons, 'C').items()) <= xsum(
+    value * vars[key] for key, value in count_items_in_combinations(inconnus_combinaisons, 'A').items()) - 100
+
+# Optimize the model
+m.optimize()
+
+# Check if an optimal solution was found and print results
+if m.status == OptimizationStatus.OPTIMAL:
+    for i, var in enumerate(vars):
+        print(f"{inconnus_combinaisons[i]} = {var.x}")
+    print(f"Total Cost: {m.objective_value}")
 else:
     print("Impossible solution")
