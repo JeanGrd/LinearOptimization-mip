@@ -16,6 +16,7 @@ cout_par_metre = 120
 
 # Génération des combinaisons valides de découpe
 combinaisons = generate_valid_combinations(longueurs_bandes, 180, 245)
+print(len(combinaisons))
 
 # Calcul du bénéfice pour chaque combinaison
 benefices_combinaisons = [sum(prix_vente_bandes[i] for i in comb) - cout_par_metre for comb in combinaisons]
@@ -29,6 +30,7 @@ variables = [modele.add_var(name=v) for v in variables_combinaisons]
 
 # Définition de la fonction objectif
 modele.objective = xsum(benefices_combinaisons[i] * variables[i] for i in range(len(benefices_combinaisons)))
+print(modele.objective)
 
 # Contrainte : ne pas produire plus de 400m de chaque bande
 modele += xsum(value * variables[key] for key, value in count_items_in_combinations(variables_combinaisons, 'A').items()) <= 400
